@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'peterparkerm4178@gmail.com';
+    }
+
+    // Users directory & profile
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Username reservation & handle lookup
+    match /usernames/{username} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Direct Chats & Messages
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Group Chats & Channels
+    match /group_chats/{groupId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Friend Requests & Relationships
+    match /friend_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /friends/{friendDocId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Reports & Moderation: Only admin can review reports
+    match /reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
