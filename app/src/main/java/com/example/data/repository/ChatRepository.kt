@@ -101,8 +101,47 @@ class ChatRepository(
                 deliveryMode = DeliveryMode.CLOUD_REALTIME,
                 status = MessageStatus.SENT
             )
+            val current = localMessagesByChat.value[chatId] ?: emptyList()
+            localMessagesByChat.value = localMessagesByChat.value + (chatId to (current + cloudMsg))
             firestoreService.sendChatMessage(cloudMsg)
             return Result.success(cloudMsg)
         }
+    }
+
+    suspend fun clearChatMessages(chatId: String): Result<Unit> {
+        val currentMap = localMessagesByChat.value.toMutableMap()
+        currentMap.remove(chatId)
+        localMessagesByChat.value = currentMap
+        return firestoreService.clearChatMessages(chatId)
+    }
+
+    suspend fun voteMessage(chatId: String, messageId: String, userId: String, isUpvote: Boolean): Result<Unit> {
+        localMessagesByChat.value = localMessagesByChat.value.mapValues { (cId, msgs) ->
+            if (cId == chatId) {
+                msgs.map { m ->
+                    if (m.id == messageId) {
+                        var newUp = m.upvotedBy
+                        var newDown = m.downvotedBy
+                        if (isUpvote) {
+                            if (newUp.contains(userId)) {
+                                newUp = newUp - userId
+                            } else {
+                                newUp = newUp + userId
+                                newDown = newDown - userId
+                            }
+                        } else {
+                            if (newDown.contains(userId)) {
+                                newDown = newDown - userId
+                            } else {
+                                newDown = newDown + userId
+                                newUp = newUp - userId
+                            }
+                        }
+                        m.copy(upvotedBy = newUp, downvotedBy = newDown)
+                    } else m
+                }
+            } else msgs
+        }
+        return firestoreService.voteChatMessage(chatId, messageId, userId, isUpvote)
     }
 }

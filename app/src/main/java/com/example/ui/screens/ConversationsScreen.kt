@@ -30,12 +30,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
@@ -96,6 +98,7 @@ data class MengobrolStory(
     val name: String,
     val avatarUrl: String,
     val isAddButton: Boolean = false,
+    val isSnapchatProfile: Boolean = false,
     val friend: Friend? = null,
     val peer: LocalPeer? = null
 )
@@ -121,6 +124,7 @@ fun ConversationsScreen(
     groupChats: List<GroupChat>,
     discoveredPeers: List<LocalPeer>,
     isLocalWifiMode: Boolean,
+    pendingRequestsCount: Int = 0,
     onSelectFriend: (Friend) -> Unit,
     onSelectGroupChat: (GroupChat) -> Unit,
     onSelectLocalPeer: (LocalPeer) -> Unit,
@@ -130,6 +134,7 @@ fun ConversationsScreen(
     onNavigateSettings: () -> Unit = {},
     onNavigateCalls: () -> Unit = {},
     onNavigateModeration: () -> Unit = {},
+    onNavigateSnapProfile: () -> Unit = {},
     onToggleConnectionMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -141,9 +146,17 @@ fun ConversationsScreen(
     val focusManager = LocalFocusManager.current
 
     // Build Stories List: Real contacts and discovered local peers
-    val stories = remember(friends, discoveredPeers) {
+    val stories = remember(friends, discoveredPeers, currentUser) {
         val list = mutableListOf<MengobrolStory>()
-        list.add(MengobrolStory("add_story", "Add contact", "", isAddButton = true))
+        list.add(
+            MengobrolStory(
+                id = "snap_profile_story",
+                name = "My Kicon",
+                avatarUrl = "bitmoji://",
+                isSnapchatProfile = true
+            )
+        )
+        list.add(MengobrolStory("add_story", "Add friend", "", isAddButton = true))
 
         friends.forEach { f ->
             list.add(
@@ -334,14 +347,79 @@ fun ConversationsScreen(
                     items(stories) { story ->
                         MengobrolStoryItemView(
                             item = story,
+                            currentUser = currentUser,
                             onClick = {
                                 when {
+                                    story.isSnapchatProfile -> onNavigateSnapProfile()
                                     story.isAddButton -> onNavigateFriends()
                                     story.friend != null -> onSelectFriend(story.friend)
                                     story.peer != null -> onSelectLocalPeer(story.peer)
                                 }
                             }
                         )
+                    }
+                }
+            }
+
+            // Pending Friend Requests Banner (Facebook-style)
+            if (pendingRequestsCount > 0) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                            .clickable { onNavigateFriends() }
+                            .testTag("friend_requests_banner"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PersonAdd,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "$pendingRequestsCount Friend Request${if (pendingRequestsCount > 1) "s" else ""}",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "Tap to review & accept to talk like Facebook friends",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "View",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -403,6 +481,14 @@ fun ConversationsScreen(
                                     }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Kicon Profile Studio") },
+                                leadingIcon = { Text("✨", fontSize = 16.sp) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onNavigateSnapProfile()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Settings") },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
@@ -551,6 +637,10 @@ fun ConversationsScreen(
                     onNewCommunity = {
                         showBottomSheet = false
                         onCreateGroupClick()
+                    },
+                    onCustomProfile = {
+                        showBottomSheet = false
+                        onNavigateSnapProfile()
                     }
                 )
             }
@@ -562,13 +652,39 @@ fun ConversationsScreen(
 @Composable
 fun MengobrolStoryItemView(
     item: MengobrolStory,
+    currentUser: User? = null,
     onClick: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(56.dp)
     ) {
-        if (item.isAddButton) {
+        if (item.isSnapchatProfile) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .border(2.5.dp, com.example.ui.theme.SnapchatYellow, CircleShape)
+                    .clickable(onClick = onClick)
+                    .testTag("story_snapchat_profile"),
+                contentAlignment = Alignment.Center
+            ) {
+                com.example.ui.components.BitmojiAvatar(
+                    skin = currentUser?.bitmojiSkin ?: "light",
+                    hair = currentUser?.bitmojiHair ?: "fade",
+                    hairColor = currentUser?.bitmojiHairColor ?: "black",
+                    outfit = currentUser?.bitmojiOutfit ?: "snap_hoodie",
+                    outfitColor = currentUser?.bitmojiOutfitColor ?: "yellow",
+                    mood = currentUser?.bitmojiMood ?: "smile",
+                    accessory = currentUser?.bitmojiAccessory ?: "none",
+                    background = currentUser?.bitmojiBackground ?: "sunset",
+                    pose = currentUser?.bitmojiPose ?: "peace",
+                    size = 50.dp,
+                    showBackground = true,
+                    isCircle = true
+                )
+            }
+        } else if (item.isAddButton) {
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -813,7 +929,8 @@ fun MengobrolActionBottomSheet(
     onDismiss: () -> Unit,
     onNewChat: () -> Unit = onDismiss,
     onNewContact: () -> Unit = onDismiss,
-    onNewCommunity: () -> Unit = onDismiss
+    onNewCommunity: () -> Unit = onDismiss,
+    onCustomProfile: () -> Unit = onDismiss
 ) {
     Column(
         modifier = Modifier
@@ -848,6 +965,13 @@ fun MengobrolActionBottomSheet(
                     title = "New Community",
                     subtitle = "Join the community around you",
                     onClick = onNewCommunity
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                MengobrolActionItem(
+                    icon = Icons.Outlined.PersonOutline,
+                    title = "Kicon Custom Profile",
+                    subtitle = "Customize 3D Kicon avatar, outfits, pose & card",
+                    onClick = onCustomProfile
                 )
             }
         }

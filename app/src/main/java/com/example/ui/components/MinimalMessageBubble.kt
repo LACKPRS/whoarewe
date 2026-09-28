@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.ChatMessage
 import com.example.model.DeliveryMode
+import com.example.model.MessageStatus
+import com.example.ui.theme.AccentSky
 import com.example.ui.theme.BubbleGradientColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,6 +42,9 @@ import java.util.Locale
 fun MinimalMessageBubble(
     message: ChatMessage,
     isCurrentUser: Boolean,
+    currentUserId: String = "",
+    onUpvote: () -> Unit = {},
+    onDownvote: () -> Unit = {},
     onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -78,49 +83,87 @@ fun MinimalMessageBubble(
         } else {
             Modifier
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), bubbleShape)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), bubbleShape)
         }
 
         Box(
             modifier = Modifier
-                .widthIn(max = 310.dp)
+                .widthIn(min = 100.dp, max = 320.dp)
                 .clip(bubbleShape)
                 .then(backgroundModifier)
                 .testTag("message_bubble_${message.id}")
                 .combinedClickable(
-                    onClick = {},
+                    onClick = onLongClick,
                     onLongClick = onLongClick
                 )
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        color = if (isCurrentUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isCurrentUser) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
+                        fontWeight = FontWeight.Normal,
                         lineHeight = 20.sp
                     )
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Row(
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DeliveryModeBadge(deliveryMode = message.deliveryMode)
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    Text(
-                        text = formattedTime,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            color = if (isCurrentUser) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Medium
-                        )
+                    // Reddit Upvote / Downvote Pill
+                    RedditVotePill(
+                        score = message.score,
+                        isUpvoted = message.upvotedBy.contains(currentUserId),
+                        isDownvoted = message.downvotedBy.contains(currentUserId),
+                        onUpvote = onUpvote,
+                        onDownvote = onDownvote,
+                        messageId = message.id,
+                        isDarkBubble = isCurrentUser
                     )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DeliveryModeBadge(deliveryMode = message.deliveryMode)
+
+                        Spacer(modifier = Modifier.width(5.dp))
+
+                        Text(
+                            text = formattedTime,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                color = if (isCurrentUser) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        if (isCurrentUser) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = when (message.status) {
+                                    MessageStatus.READ -> "✓✓"
+                                    MessageStatus.DELIVERED -> "✓✓"
+                                    MessageStatus.SENT -> "✓"
+                                    MessageStatus.SENDING -> "•"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    color = if (message.status == MessageStatus.READ) AccentSky else Color.White.copy(alpha = 0.85f),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }

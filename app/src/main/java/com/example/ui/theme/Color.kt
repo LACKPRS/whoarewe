@@ -42,3 +42,17 @@ val PinCardBorderDark = Color(0xFF263345)
 val StoryGradientColors = listOf(PinViolet, PinMagenta, PinBlue, PinViolet)
 val BubbleGradientColors = listOf(PinViolet, PinIndigo, PinBlue)
 val HeroBannerGradientColors = listOf(PinViolet, PinBlue, PinLightBlue)
+
+// Reddit Voting Colors
+val RedditOrange = Color(0xFFFF4500)
+val RedditOrangeTint = Color(0x26FF4500)
+val RedditDownvoteBlue = Color(0xFF7193FF)
+val RedditDownvoteTint = Color(0x267193FF)
+
+// Snapchat Colors
+val SnapchatYellow = Color(0xFFFFFC00)
+val SnapchatYellowDark = Color(0xFFE5E200)
+val SnapchatGhost = Color(0xFFFFFFFF)
+val SnapchatBlack = Color(0xFF0F0F0F)
+val SnapchatCardDark = Color(0xFF1E1E24)
+

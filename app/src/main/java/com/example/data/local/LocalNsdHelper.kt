@@ -54,6 +54,7 @@ class LocalNsdHelper(private val context: Context) {
                 setAttribute("username", currentUser.username)
                 setAttribute("displayName", currentUser.displayName)
                 setAttribute("voipPort", voipPort.toString())
+                setAttribute("uid", currentUser.uid)
             }
 
             registrationListener = object : NsdManager.RegistrationListener {
@@ -145,6 +146,7 @@ class LocalNsdHelper(private val context: Context) {
                     ?: username
                 val voipPortStr = serviceInfo.attributes["voipPort"]?.let { String(it, StandardCharsets.UTF_8) }
                 val voipPort = voipPortStr?.toIntOrNull() ?: 50555
+                val uid = serviceInfo.attributes["uid"]?.let { String(it, StandardCharsets.UTF_8) } ?: "local_$username"
 
                 val peer = LocalPeer(
                     serviceName = serviceInfo.serviceName,
@@ -152,7 +154,8 @@ class LocalNsdHelper(private val context: Context) {
                     displayName = displayName,
                     hostAddress = host,
                     port = port,
-                    voipPort = voipPort
+                    voipPort = voipPort,
+                    uid = uid
                 )
 
                 scope.launch {

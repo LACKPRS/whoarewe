@@ -60,6 +60,19 @@ class FirebaseAuthManager(private val context: Context) {
                 .putString("saved_photo_url", user.photoUrl)
                 .putString("saved_role", user.role.name)
                 .putLong("saved_created_at", user.createdAt)
+                .putString("saved_zodiac_sign", user.zodiacSign)
+                .putString("saved_bitmoji_skin", user.bitmojiSkin)
+                .putString("saved_bitmoji_hair", user.bitmojiHair)
+                .putString("saved_bitmoji_hair_color", user.bitmojiHairColor)
+                .putString("saved_bitmoji_outfit", user.bitmojiOutfit)
+                .putString("saved_bitmoji_outfit_color", user.bitmojiOutfitColor)
+                .putString("saved_bitmoji_mood", user.bitmojiMood)
+                .putString("saved_bitmoji_accessory", user.bitmojiAccessory)
+                .putString("saved_bitmoji_background", user.bitmojiBackground)
+                .putString("saved_bitmoji_pose", user.bitmojiPose)
+                .putInt("saved_snap_score", user.snapScore)
+                .putInt("saved_snap_streaks", user.snapStreaks)
+                .putBoolean("saved_has_custom_bitmoji", user.hasCustomBitmoji)
                 .putBoolean("is_logged_in", true)
                 .apply()
         } catch (e: Exception) {
@@ -114,7 +127,20 @@ class FirebaseAuthManager(private val context: Context) {
                     photoUrl = prefs.getString("saved_photo_url", "") ?: "",
                     role = role,
                     isOnline = true,
-                    createdAt = prefs.getLong("saved_created_at", System.currentTimeMillis())
+                    createdAt = prefs.getLong("saved_created_at", System.currentTimeMillis()),
+                    zodiacSign = prefs.getString("saved_zodiac_sign", "Aries ♈") ?: "Aries ♈",
+                    bitmojiSkin = prefs.getString("saved_bitmoji_skin", "light") ?: "light",
+                    bitmojiHair = prefs.getString("saved_bitmoji_hair", "fade") ?: "fade",
+                    bitmojiHairColor = prefs.getString("saved_bitmoji_hair_color", "black") ?: "black",
+                    bitmojiOutfit = prefs.getString("saved_bitmoji_outfit", "snap_hoodie") ?: "snap_hoodie",
+                    bitmojiOutfitColor = prefs.getString("saved_bitmoji_outfit_color", "yellow") ?: "yellow",
+                    bitmojiMood = prefs.getString("saved_bitmoji_mood", "smile") ?: "smile",
+                    bitmojiAccessory = prefs.getString("saved_bitmoji_accessory", "none") ?: "none",
+                    bitmojiBackground = prefs.getString("saved_bitmoji_background", "sunset") ?: "sunset",
+                    bitmojiPose = prefs.getString("saved_bitmoji_pose", "peace") ?: "peace",
+                    snapScore = prefs.getInt("saved_snap_score", 1420),
+                    snapStreaks = prefs.getInt("saved_snap_streaks", 7),
+                    hasCustomBitmoji = prefs.getBoolean("saved_has_custom_bitmoji", true)
                 )
             }
         } catch (e: Exception) {
@@ -303,6 +329,40 @@ class FirebaseAuthManager(private val context: Context) {
         val updated = current.copy(
             displayName = displayName.ifBlank { current.displayName },
             statusText = statusText.ifBlank { current.statusText }
+        )
+        _currentUser.value = updated
+        saveUserSession(updated)
+    }
+
+    fun updateSnapProfile(
+        displayName: String,
+        statusText: String,
+        zodiacSign: String,
+        bitmojiSkin: String,
+        bitmojiHair: String,
+        bitmojiHairColor: String,
+        bitmojiOutfit: String,
+        bitmojiOutfitColor: String,
+        bitmojiMood: String,
+        bitmojiAccessory: String,
+        bitmojiBackground: String,
+        bitmojiPose: String
+    ) {
+        val current = _currentUser.value ?: return
+        val updated = current.copy(
+            displayName = displayName.ifBlank { current.displayName },
+            statusText = statusText.ifBlank { current.statusText },
+            zodiacSign = zodiacSign,
+            bitmojiSkin = bitmojiSkin,
+            bitmojiHair = bitmojiHair,
+            bitmojiHairColor = bitmojiHairColor,
+            bitmojiOutfit = bitmojiOutfit,
+            bitmojiOutfitColor = bitmojiOutfitColor,
+            bitmojiMood = bitmojiMood,
+            bitmojiAccessory = bitmojiAccessory,
+            bitmojiBackground = bitmojiBackground,
+            bitmojiPose = bitmojiPose,
+            hasCustomBitmoji = true
         )
         _currentUser.value = updated
         saveUserSession(updated)

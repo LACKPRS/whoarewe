@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,10 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,6 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -58,10 +65,9 @@ import com.example.model.Friend
 import com.example.model.FriendRequest
 import com.example.model.User
 import com.example.ui.components.OnlineStatusDot
-import com.example.ui.components.RoleBadge
+import com.example.ui.components.UserAvatar
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
-import com.example.ui.theme.AccentSky
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,37 +84,81 @@ fun FriendsScreen(
     statusMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(if (pendingRequests.isNotEmpty()) 1 else 0) }
     var searchQuery by remember { mutableStateOf("") }
+    var sentRequestsByUsernames by remember { mutableStateOf(setOf<String>()) }
 
-    Column(
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        onSearch("")
+    }
+
+    BackHandler {
+        onBack()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = "Friends & Connections",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${friends.size} friends • Connect and talk freely",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack, modifier = Modifier.testTag("friends_back_button")) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        },
         modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(10.dp))
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Search by Unique Username
+            // Search Bar for Finding Friends
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = {
                     searchQuery = it
                     onSearch(it)
                 },
-                placeholder = { Text("Search by @username...") },
+                placeholder = { Text("Search by name or @username...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = {
-                            onSendFriendRequest(searchQuery.trim().removePrefix("@"))
+                            val target = searchQuery.trim().removePrefix("@")
+                            onSendFriendRequest(target)
+                            sentRequestsByUsernames = sentRequestsByUsernames + target.lowercase()
                         }) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = "Add Friend", tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Default.PersonAdd,
+                                contentDescription = "Send Friend Request",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("search_user_input")
@@ -120,35 +170,38 @@ fun FriendsScreen(
                     text = statusMessage,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = AccentEmerald,
-                        fontFamily = FontFamily.Monospace
+                        fontWeight = FontWeight.SemiBold
                     ),
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
 
-            // Search Results Preview
+            // Real-time Search Results Box if actively searching
             if (searchQuery.isNotBlank() && searchResults.isNotEmpty()) {
                 Text(
                     text = "SEARCH RESULTS:",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
                 )
 
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.height(140.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.height(160.dp)
                 ) {
                     items(searchResults) { user ->
+                        val isAlreadyFriend = friends.any { it.uid == user.uid }
+                        val isRequested = sentRequestsByUsernames.contains(user.username.lowercase())
+
                         Card(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -157,17 +210,61 @@ fun FriendsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
-                                    Text(text = user.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                    Text(text = "@${user.username}", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    UserAvatar(
+                                        photoUrl = user.photoUrl,
+                                        displayName = user.displayName,
+                                        size = 40.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(text = user.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(text = "@${user.username}", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary))
+                                    }
                                 }
 
-                                Button(
-                                    onClick = { onSendFriendRequest(user.username) },
-                                    shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.testTag("send_request_${user.username}")
-                                ) {
-                                    Text("Add", fontSize = 12.sp)
+                                when {
+                                    isAlreadyFriend -> {
+                                        val friendObj = friends.find { it.uid == user.uid }
+                                        if (friendObj != null) {
+                                            Button(
+                                                onClick = { onStartChat(friendObj) },
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                                modifier = Modifier.testTag("chat_result_${user.username}")
+                                            ) {
+                                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Message", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                            }
+                                        }
+                                    }
+                                    isRequested -> {
+                                        OutlinedButton(
+                                            onClick = {},
+                                            enabled = false,
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("Requested", fontSize = 12.sp)
+                                        }
+                                    }
+                                    else -> {
+                                        Button(
+                                            onClick = {
+                                                onSendFriendRequest(user.username)
+                                                sentRequestsByUsernames = sentRequestsByUsernames + user.username.lowercase()
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.testTag("send_request_${user.username}")
+                                        ) {
+                                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add Friend", fontSize = 12.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -175,200 +272,462 @@ fun FriendsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Tab Row
+            // Facebook-style Tab Navigation (Friends vs Friend Requests vs Find Friends)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("All Friends (${friends.size})", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text("Friends (${friends.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    },
                     modifier = Modifier.testTag("tab_all_friends")
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = {
-                        Text(
-                            text = if (pendingRequests.isNotEmpty()) "Requests (${pendingRequests.size})" else "Requests",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Requests",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            if (pendingRequests.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(AccentRose)
+                                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "${pendingRequests.size}",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     },
                     modifier = Modifier.testTag("tab_requests")
                 )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = {
+                        Text("Find Friends", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    },
+                    modifier = Modifier.testTag("tab_find_friends")
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            if (selectedTab == 0) {
-                // All Friends List
-                if (friends.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No friends added yet. Search a unique username to connect!",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(friends) { friend ->
-                            Card(
-                                shape = RoundedCornerShape(20.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
-                                    .clickable { onStartChat(friend) }
-                                    .testTag("friend_card_${friend.username}")
-                            ) {
-                                Row(
+            when (selectedTab) {
+                0 -> {
+                    // TAB 0: ALL ACCEPTED FRIENDS (Facebook Friends - can talk, message, call)
+                    if (friends.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = 60.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Group,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(54.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "No friends connected yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Send friend requests to connect and talk like Facebook friends!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { selectedTab = 2 },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Find Friends to Add")
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(friends) { friend ->
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                        .clickable { onStartChat(friend) }
+                                        .testTag("friend_card_${friend.username}")
                                 ) {
                                     Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f)
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Box {
-                                            com.example.ui.components.UserAvatar(
-                                                photoUrl = friend.photoUrl,
-                                                displayName = friend.displayName,
-                                                size = 48.dp,
-                                                hasStoryRing = true
-                                            )
-                                            OnlineStatusDot(
-                                                isOnline = friend.isOnline,
-                                                isLocalWifi = friend.isLocalWifiPeer,
-                                                modifier = Modifier.align(Alignment.BottomEnd)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(14.dp))
-
-                                        Column {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = friend.displayName,
-                                                    style = MaterialTheme.typography.titleMedium.copy(
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box {
+                                                UserAvatar(
+                                                    photoUrl = friend.photoUrl,
+                                                    displayName = friend.displayName,
+                                                    size = 52.dp,
+                                                    hasStoryRing = true
                                                 )
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                                OnlineStatusDot(
+                                                    isOnline = friend.isOnline,
+                                                    isLocalWifi = friend.isLocalWifiPeer,
+                                                    modifier = Modifier.align(Alignment.BottomEnd)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(14.dp))
+
+                                            Column {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = friend.displayName,
+                                                        style = MaterialTheme.typography.titleMedium.copy(
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    )
+                                                }
                                                 Text(
                                                     text = "@${friend.username}",
                                                     style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontFamily = FontFamily.Monospace,
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
                                                 )
-                                            }
-                                            Text(
-                                                text = if (friend.isLocalWifiPeer) "Active on Local Wi-Fi Router" else friend.statusText,
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    color = if (friend.isLocalWifiPeer) AccentEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = if (friend.isLocalWifiPeer) "Active on Local Wi-Fi" else friend.statusText,
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        color = if (friend.isLocalWifiPeer) AccentEmerald else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        fontSize = 12.sp
+                                                    ),
+                                                    maxLines = 1
                                                 )
-                                            )
+                                            }
                                         }
-                                    }
 
-                                    Button(
-                                        onClick = { onStartChat(friend) },
-                                        shape = RoundedCornerShape(16.dp),
-                                        modifier = Modifier.testTag("chat_friend_${friend.username}")
-                                    ) {
-                                        Text("Chat", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        // Facebook-style direct "Message" button
+                                        Button(
+                                            onClick = { onStartChat(friend) },
+                                            shape = RoundedCornerShape(20.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            ),
+                                            modifier = Modifier.testTag("chat_friend_${friend.username}")
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.Chat,
+                                                contentDescription = "Message",
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Message", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            } else {
-                // Pending Friend Requests List
-                if (pendingRequests.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No pending friend requests",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(pendingRequests) { req ->
-                            Card(
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                                    .testTag("request_item_${req.id}")
-                            ) {
-                                Row(
+
+                1 -> {
+                    // TAB 1: PENDING FRIEND REQUESTS (Facebook-style Confirm / Delete)
+                    if (pendingRequests.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = 60.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = AccentEmerald.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "No pending friend requests",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "When someone sends you a friend request, it will appear here.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(pendingRequests) { req ->
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                                        .testTag("request_item_${req.id}")
                                 ) {
-                                    Column {
-                                        Text(text = req.fromDisplayName, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = "@${req.fromUsername} sent you a request",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontFamily = FontFamily.Monospace,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        )
-                                    }
-
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(
-                                            onClick = { onDeclineRequest(req) },
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(AccentRose.copy(alpha = 0.2f))
-                                                .testTag("decline_req_${req.id}")
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Icon(Icons.Default.Close, contentDescription = "Decline", tint = AccentRose)
+                                            UserAvatar(
+                                                photoUrl = req.fromPhotoUrl,
+                                                displayName = req.fromDisplayName,
+                                                size = 54.dp
+                                            )
+
+                                            Spacer(modifier = Modifier.width(14.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = req.fromDisplayName,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "@${req.fromUsername}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "Sent you a friend request",
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        fontSize = 12.sp
+                                                    )
+                                                )
+                                            }
                                         }
 
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.height(14.dp))
 
-                                        IconButton(
-                                            onClick = { onAcceptRequest(req) },
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(AccentEmerald.copy(alpha = 0.2f))
-                                                .testTag("accept_req_${req.id}")
+                                        // Facebook-style Confirm & Delete action buttons
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Icon(Icons.Default.Check, contentDescription = "Accept", tint = AccentEmerald)
+                                            Button(
+                                                onClick = {
+                                                    onAcceptRequest(req)
+                                                    selectedTab = 0
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(42.dp)
+                                                    .testTag("confirm_req_${req.id}"),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Confirm", fontWeight = FontWeight.Bold)
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = { onDeclineRequest(req) },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(42.dp)
+                                                    .testTag("decline_req_${req.id}"),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Delete")
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                2 -> {
+                    // TAB 2: FIND FRIENDS & SEND REQUESTS
+                    val nonFriendSuggestions = searchResults.filter { candidate ->
+                        !friends.any { it.uid == candidate.uid }
+                    }
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Text(
+                                text = "Suggested People to Add:",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                ),
+                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                            )
+                        }
+
+                        if (nonFriendSuggestions.isNotEmpty()) {
+                            items(nonFriendSuggestions) { candidate ->
+                                val isRequested = sentRequestsByUsernames.contains(candidate.username.lowercase())
+                                Card(
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+                                        .testTag("suggested_friend_${candidate.username}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            UserAvatar(
+                                                photoUrl = candidate.photoUrl,
+                                                displayName = candidate.displayName,
+                                                size = 46.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    text = candidate.displayName,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                                )
+                                                Text(
+                                                    text = "@${candidate.username}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                )
+                                                if (candidate.statusText.isNotBlank()) {
+                                                    Text(
+                                                        text = candidate.statusText,
+                                                        style = MaterialTheme.typography.bodySmall.copy(
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            fontSize = 11.sp
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        if (isRequested) {
+                                            OutlinedButton(
+                                                onClick = {},
+                                                enabled = false,
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Requested", fontSize = 12.sp)
+                                            }
+                                        } else {
+                                            Button(
+                                                onClick = {
+                                                    onSendFriendRequest(candidate.username)
+                                                    sentRequestsByUsernames = sentRequestsByUsernames + candidate.username.lowercase()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.testTag("btn_add_friend_${candidate.username}")
+                                            ) {
+                                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Add Friend", fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Card(
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+                                    .padding(2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        text = "💡 How Friend Requests Work",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "1. Enter a person's username (e.g. @alex, @sam, @jordan) or pick from suggestions above\n2. Tap 'Add Friend' to send a request\n3. Once accepted, you can chat, call, share media and upvote messages like Facebook friends!",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 20.sp
+                                        )
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(40.dp))
                         }
                     }
                 }
             }
 
-        Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(40.dp))
+        }
     }
 }

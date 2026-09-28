@@ -21,7 +21,20 @@ data class User(
     val lastSeen: Long = System.currentTimeMillis(),
     val isBanned: Boolean = false,
     val warningCount: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val snapScore: Int = 1420,
+    val snapStreaks: Int = 7,
+    val zodiacSign: String = "Aries ♈",
+    val bitmojiSkin: String = "light",
+    val bitmojiHair: String = "fade",
+    val bitmojiHairColor: String = "black",
+    val bitmojiOutfit: String = "snap_hoodie",
+    val bitmojiOutfitColor: String = "yellow",
+    val bitmojiMood: String = "smile",
+    val bitmojiAccessory: String = "none",
+    val bitmojiBackground: String = "sunset",
+    val bitmojiPose: String = "peace",
+    val hasCustomBitmoji: Boolean = true
 ) {
     companion object {
         const val EXCLUSIVE_ADMIN_EMAIL = "peterparkerm4178@gmail.com"

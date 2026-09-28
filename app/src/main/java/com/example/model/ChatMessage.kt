@@ -22,5 +22,9 @@ data class ChatMessage(
     val text: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val deliveryMode: DeliveryMode = DeliveryMode.CLOUD_REALTIME,
-    val status: MessageStatus = MessageStatus.SENT
-)
+    val status: MessageStatus = MessageStatus.SENT,
+    val upvotedBy: List<String> = emptyList(),
+    val downvotedBy: List<String> = emptyList()
+) {
+    val score: Int get() = upvotedBy.size - downvotedBy.size
+}

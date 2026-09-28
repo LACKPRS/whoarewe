@@ -52,19 +52,12 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun TextFlowTheme(
-    themeMode: ThemeMode = ThemeMode.DARK,
+    themeMode: ThemeMode = ThemeMode.LIGHT,
     content: @Composable () -> Unit
 ) {
-    val isDark = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-
-    val colorScheme = if (isDark) DarkColorScheme else LightColorScheme
-
+    // Dark mode removed per user request; always use clean, modern LightColorScheme
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = LightColorScheme,
         typography = Typography,
         content = content
     )

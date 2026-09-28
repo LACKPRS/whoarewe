@@ -105,29 +105,7 @@ fun MinimalTopBar(
             }
         },
         actions = {
-            if (currentUser != null && currentUser.role.canModerate() && onOpenModeration != null) {
-                IconButton(
-                    onClick = onOpenModeration,
-                    modifier = Modifier.testTag("open_moderation_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = "Moderation Panel",
-                        tint = MaterialTheme.colorScheme.tertiary
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = onToggleTheme,
-                modifier = Modifier.testTag("toggle_theme_button")
-            ) {
-                Icon(
-                    imageVector = if (themeMode == ThemeMode.DARK) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = "Toggle Dark Mode",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
+            // Shield and dark mode symbols removed from top per user request
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,

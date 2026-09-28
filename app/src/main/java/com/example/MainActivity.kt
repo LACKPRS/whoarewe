@@ -63,6 +63,7 @@ import com.example.ui.screens.GroupChatScreen
 import com.example.ui.screens.MengobrolActionBottomSheet
 import com.example.ui.screens.ModerationScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.SnapchatProfileScreen
 import com.example.ui.theme.TextFlowTheme
 
 class MainActivity : ComponentActivity() {
@@ -181,7 +182,7 @@ fun TextFlowApp(viewModel: MainViewModel) {
     var showQuickActionSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val isFullScreenMode = currentScreen == Screen.CHAT || currentScreen == Screen.GROUP_CHAT || currentScreen == Screen.ACTIVE_CALL
+    val isFullScreenMode = currentScreen == Screen.CHAT || currentScreen == Screen.GROUP_CHAT || currentScreen == Screen.ACTIVE_CALL || currentScreen == Screen.SNAP_PROFILE
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -266,12 +267,14 @@ fun TextFlowApp(viewModel: MainViewModel) {
                                     onSelectFriend = { friend -> viewModel.openChat(friend) },
                                     onSelectGroupChat = { group -> viewModel.openGroupChat(group) },
                                     onSelectLocalPeer = { peer -> viewModel.openChatWithLocalPeer(peer) },
+                                    pendingRequestsCount = pendingRequests.size,
                                     onNavigateFriends = { viewModel.navigateTo(Screen.FRIENDS) },
                                     onCreateGroupClick = { showCreateGroupDialog = true },
                                     onStartVoipCall = { friend -> viewModel.startVoipCall(friend) },
                                     onNavigateSettings = { viewModel.navigateTo(Screen.SETTINGS) },
                                     onNavigateCalls = { viewModel.navigateTo(Screen.ACTIVE_CALL) },
                                     onNavigateModeration = { viewModel.navigateTo(Screen.MODERATION) },
+                                    onNavigateSnapProfile = { viewModel.navigateTo(Screen.SNAP_PROFILE) },
                                     onToggleConnectionMode = { viewModel.toggleConnectionMode() }
                                 )
                             }
@@ -284,8 +287,10 @@ fun TextFlowApp(viewModel: MainViewModel) {
                                     peer = activeChatPeer!!,
                                     messages = currentChatMessages,
                                     onSendMessage = { text, preferLocal -> viewModel.sendMessage(text, preferLocal) },
+                                    onVoteMessage = { id, upvote -> viewModel.voteChatMessage(id, upvote) },
                                     onStartVoipCall = { peer -> viewModel.startVoipCall(peer) },
                                     onSubmitReport = { reason, excerpt -> viewModel.submitReport(reason, excerpt) },
+                                    onClearChat = { viewModel.clearCurrentChat() },
                                     onBack = { viewModel.navigateTo(Screen.CONVERSATIONS) }
                                 )
                             }
@@ -297,7 +302,10 @@ fun TextFlowApp(viewModel: MainViewModel) {
                                     currentUser = currentUser!!,
                                     group = activeGroupChat!!,
                                     messages = activeGroupMessages,
+                                    friends = friends,
                                     onSendMessage = { text -> viewModel.sendGroupMessage(text) },
+                                    onVoteMessage = { id, upvote -> viewModel.voteGroupMessage(id, upvote) },
+                                    onAddFriendsToGroup = { newMembers -> viewModel.addFriendsToGroup(activeGroupChat!!.id, newMembers) },
                                     onBack = { viewModel.closeGroupChat() }
                                 )
                             }
@@ -341,12 +349,27 @@ fun TextFlowApp(viewModel: MainViewModel) {
                                     onSelectThemeMode = { mode -> viewModel.setThemeMode(mode) },
                                     onUpdateProfile = { name, status -> viewModel.updateProfile(name, status) },
                                     onUploadProfilePicture = { uri -> viewModel.uploadProfilePicture(uri) },
+                                    onNavigateSnapProfile = { viewModel.navigateTo(Screen.SNAP_PROFILE) },
                                     onTestPushNotification = { type -> viewModel.triggerTestPushNotification(type) },
                                     onSignOut = { viewModel.signOut() },
                                     firebaseStatusText = firebaseStatusText,
                                     localChatPort = viewModel.localChatPort,
                                     localVoipPort = viewModel.localVoipPort,
                                     onBack = { viewModel.navigateTo(Screen.CONVERSATIONS) }
+                                )
+                            }
+                        }
+
+                        Screen.SNAP_PROFILE -> {
+                            if (currentUser != null) {
+                                SnapchatProfileScreen(
+                                    currentUser = currentUser!!,
+                                    onSaveProfile = { displayName, status, zodiac, skin, hair, hairColor, outfit, outfitColor, mood, accessory, background, pose ->
+                                        viewModel.updateSnapProfile(
+                                            displayName, status, zodiac, skin, hair, hairColor, outfit, outfitColor, mood, accessory, background, pose
+                                        )
+                                    },
+                                    onBack = { viewModel.navigateBack() }
                                 )
                             }
                         }
@@ -393,6 +416,10 @@ fun TextFlowApp(viewModel: MainViewModel) {
                     onNewCommunity = {
                         showQuickActionSheet = false
                         showCreateGroupDialog = true
+                    },
+                    onCustomProfile = {
+                        showQuickActionSheet = false
+                        viewModel.navigateTo(Screen.SNAP_PROFILE)
                     }
                 )
             }

@@ -29,7 +29,6 @@ import com.example.model.ThemeMode
 import com.example.model.User
 import com.example.model.UserRole
 import com.example.model.VoipCallState
-import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +43,8 @@ enum class Screen {
     FRIENDS,
     MODERATION,
     SETTINGS,
-    ACTIVE_CALL
+    ACTIVE_CALL,
+    SNAP_PROFILE
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,7 +65,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val voipCallState: StateFlow<VoipCallState> = voipEngine.callState
     val discoveredPeers: StateFlow<List<LocalPeer>> = nsdHelper.discoveredPeers
 
-    private val _themeMode = MutableStateFlow(ThemeMode.DARK)
+    private val _themeMode = MutableStateFlow(ThemeMode.LIGHT)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     private val _isLocalWifiMode = MutableStateFlow(true)
@@ -129,19 +129,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var requestsJob: Job? = null
 
     init {
-        // Initialize Notification Channels for FCM & system notifications
+        // Initialize Notification Channels for local & system notifications
         NotificationHelper.initNotificationChannels(application)
-
-        // Try getting FCM registration token
-        try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("MainViewModel", "FCM Device Token: ${task.result}")
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("MainViewModel", "FCM token registration fallback: ${e.message}")
-        }
 
         localSocketManager.onMessageReceived = { receivedMsg ->
             chatRepository.onLocalMessageReceived(receivedMsg)
@@ -258,8 +247,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Navigation & Mode Switching ---
+    private var previousScreen: Screen = Screen.CONVERSATIONS
+
     fun navigateTo(screen: Screen) {
+        if (_currentScreen.value != screen) {
+            previousScreen = _currentScreen.value
+        }
         _currentScreen.value = screen
+        _errorMessage.value = null
+        _actionStatusMessage.value = null
+    }
+
+    fun navigateBack() {
+        _currentScreen.value = previousScreen
         _errorMessage.value = null
         _actionStatusMessage.value = null
     }
@@ -326,6 +326,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun voteGroupMessage(messageId: String, isUpvote: Boolean) {
+        val user = currentUser.value ?: return
+        val group = _activeGroupChat.value ?: return
+        viewModelScope.launch {
+            groupChatRepository.voteGroupMessage(group.id, messageId, user.uid, isUpvote)
+        }
+    }
+
+    fun addFriendsToGroup(groupId: String, newMembers: List<Friend>) {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = groupChatRepository.addMembersToGroup(groupId, newMembers)
+            result.onSuccess {
+                _actionStatusMessage.value = "Added ${newMembers.size} friend(s) to group!"
+                val addedNames = newMembers.joinToString(", ") { "@${it.username}" }
+                _activeGroupChat.value?.let { current ->
+                    if (current.id == groupId) {
+                        groupChatRepository.sendGroupMessage(
+                            current,
+                            user,
+                            "👋 @${user.username} added $addedNames to the group"
+                        )
+                        _activeGroupChat.value = current.copy(
+                            memberIds = (current.memberIds + newMembers.map { it.uid }).distinct(),
+                            memberUsernames = (current.memberUsernames + newMembers.map { it.username }).distinct()
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _errorMessage.value = error.message
+            }
+            _isLoading.value = false
+        }
+    }
+
     // --- Direct Chat Actions ---
     fun openChat(friend: Friend) {
         _activeChatPeer.value = friend
@@ -341,9 +377,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun openChatWithUser(user: User) {
+        val friend = Friend(
+            uid = user.uid,
+            username = user.username,
+            displayName = user.displayName,
+            statusText = user.statusText,
+            photoUrl = user.photoUrl,
+            role = user.role,
+            isOnline = user.isOnline,
+            lastSeen = user.lastSeen
+        )
+        openChat(friend)
+    }
+
     fun openChatWithLocalPeer(peer: LocalPeer) {
+        val resolvedUid = if (peer.uid.isNotBlank() && !peer.uid.startsWith("local_")) {
+            peer.uid
+        } else {
+            _allUsers.value.find { it.username.equals(peer.username, ignoreCase = true) }?.uid ?: "local_${peer.username}"
+        }
         val friendPeer = Friend(
-            uid = "local_${peer.username}",
+            uid = resolvedUid,
             username = peer.username,
             displayName = peer.displayName,
             statusText = "Active on Local Wi-Fi Router",
@@ -358,11 +413,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         openChat(friendPeer)
     }
 
+    fun clearCurrentChat() {
+        val peer = _activeChatPeer.value ?: return
+        val myUid = currentUser.value?.uid ?: return
+        val chatId = FirestoreService.getChatId(myUid, peer.uid)
+        viewModelScope.launch {
+            chatRepository.clearChatMessages(chatId)
+            _currentChatMessages.value = emptyList()
+            _actionStatusMessage.value = "Chat conversation cleared"
+        }
+    }
+
     fun sendMessage(text: String, preferLocal: Boolean) {
         val peer = _activeChatPeer.value ?: return
         val sender = currentUser.value ?: return
         viewModelScope.launch {
             chatRepository.sendMessage(sender, peer.uid, peer.username, text, preferLocal)
+        }
+    }
+
+    fun voteChatMessage(messageId: String, isUpvote: Boolean) {
+        val user = currentUser.value ?: return
+        val peer = _activeChatPeer.value ?: return
+        val chatId = FirestoreService.getChatId(user.uid, peer.uid)
+        viewModelScope.launch {
+            chatRepository.voteMessage(chatId, messageId, user.uid, isUpvote)
         }
     }
 
@@ -552,6 +627,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = currentUser.value ?: return
         viewModelScope.launch {
             firestoreService.saveUserProfile(updated)
+        }
+    }
+
+    fun updateSnapProfile(
+        displayName: String,
+        statusText: String,
+        zodiacSign: String,
+        bitmojiSkin: String,
+        bitmojiHair: String,
+        bitmojiHairColor: String,
+        bitmojiOutfit: String,
+        bitmojiOutfitColor: String,
+        bitmojiMood: String,
+        bitmojiAccessory: String,
+        bitmojiBackground: String,
+        bitmojiPose: String
+    ) {
+        authManager.updateSnapProfile(
+            displayName,
+            statusText,
+            zodiacSign,
+            bitmojiSkin,
+            bitmojiHair,
+            bitmojiHairColor,
+            bitmojiOutfit,
+            bitmojiOutfitColor,
+            bitmojiMood,
+            bitmojiAccessory,
+            bitmojiBackground,
+            bitmojiPose
+        )
+        val updated = currentUser.value ?: return
+        viewModelScope.launch {
+            firestoreService.saveUserProfile(updated)
+            firestoreService.updateUserSnapProfile(
+                userId = updated.uid,
+                displayName = displayName,
+                statusText = statusText,
+                zodiacSign = zodiacSign,
+                bitmojiSkin = bitmojiSkin,
+                bitmojiHair = bitmojiHair,
+                bitmojiHairColor = bitmojiHairColor,
+                bitmojiOutfit = bitmojiOutfit,
+                bitmojiOutfitColor = bitmojiOutfitColor,
+                bitmojiMood = bitmojiMood,
+                bitmojiAccessory = bitmojiAccessory,
+                bitmojiBackground = bitmojiBackground,
+                bitmojiPose = bitmojiPose
+            )
+            _actionStatusMessage.value = "Kicon Profile updated! ✨"
         }
     }
 

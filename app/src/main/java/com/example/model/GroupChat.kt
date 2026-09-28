@@ -23,5 +23,9 @@ data class GroupMessage(
     val senderDisplayName: String = "",
     val senderPhotoUrl: String = "",
     val text: String = "",
-    val timestamp: Long = System.currentTimeMillis()
-)
+    val timestamp: Long = System.currentTimeMillis(),
+    val upvotedBy: List<String> = emptyList(),
+    val downvotedBy: List<String> = emptyList()
+) {
+    val score: Int get() = upvotedBy.size - downvotedBy.size
+}

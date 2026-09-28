@@ -44,7 +44,66 @@ class FirestoreService(private val context: Context) {
     }
 
     // In-memory fallback stores for offline/preview mode (clean empty states)
-    private val mockUsers = MutableStateFlow<Map<String, User>>(emptyMap())
+    private val mockUsers = MutableStateFlow<Map<String, User>>(
+        listOf(
+            User(
+                uid = "user_alex",
+                email = "alex@kaiser.internal",
+                username = "alex",
+                displayName = "Alex Rivera",
+                statusText = "Building next-gen mobile apps 🚀",
+                photoUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                role = UserRole.STANDARD,
+                isOnline = true,
+                bitmojiHair = "fade",
+                bitmojiOutfit = "snap_jacket",
+                snapScore = 1420,
+                snapStreaks = 18
+            ),
+            User(
+                uid = "user_sam",
+                email = "sam@kaiser.internal",
+                username = "sam",
+                displayName = "Sam Taylor",
+                statusText = "Coffee, music & chats ☕🎧",
+                photoUrl = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                role = UserRole.STANDARD,
+                isOnline = true,
+                bitmojiHair = "curly",
+                bitmojiOutfit = "casual_tee",
+                snapScore = 890,
+                snapStreaks = 7
+            ),
+            User(
+                uid = "user_jordan",
+                email = "jordan@kaiser.internal",
+                username = "jordan",
+                displayName = "Jordan Lee",
+                statusText = "Catch me on Kaiser! 💬",
+                photoUrl = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+                role = UserRole.STANDARD,
+                isOnline = true,
+                bitmojiHair = "bob",
+                bitmojiOutfit = "sporty",
+                snapScore = 2100,
+                snapStreaks = 32
+            ),
+            User(
+                uid = "user_elena",
+                email = "elena@kaiser.internal",
+                username = "elena",
+                displayName = "Elena Vance",
+                statusText = "Living in the moment ✨",
+                photoUrl = "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150",
+                role = UserRole.STANDARD,
+                isOnline = false,
+                bitmojiHair = "ponytail",
+                bitmojiOutfit = "hoodie",
+                snapScore = 530,
+                snapStreaks = 3
+            )
+        ).associateBy { it.uid }
+    )
     private val mockFriendRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     private val mockFriends = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     private val mockMessages = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
@@ -77,7 +136,20 @@ class FirestoreService(private val context: Context) {
                     "lastSeen" to cleanUser.lastSeen,
                     "isBanned" to cleanUser.isBanned,
                     "warningCount" to cleanUser.warningCount,
-                    "createdAt" to cleanUser.createdAt
+                    "createdAt" to cleanUser.createdAt,
+                    "snapScore" to cleanUser.snapScore,
+                    "snapStreaks" to cleanUser.snapStreaks,
+                    "zodiacSign" to cleanUser.zodiacSign,
+                    "bitmojiSkin" to cleanUser.bitmojiSkin,
+                    "bitmojiHair" to cleanUser.bitmojiHair,
+                    "bitmojiHairColor" to cleanUser.bitmojiHairColor,
+                    "bitmojiOutfit" to cleanUser.bitmojiOutfit,
+                    "bitmojiOutfitColor" to cleanUser.bitmojiOutfitColor,
+                    "bitmojiMood" to cleanUser.bitmojiMood,
+                    "bitmojiAccessory" to cleanUser.bitmojiAccessory,
+                    "bitmojiBackground" to cleanUser.bitmojiBackground,
+                    "bitmojiPose" to cleanUser.bitmojiPose,
+                    "hasCustomBitmoji" to cleanUser.hasCustomBitmoji
                 )
                 firestore.collection("users").document(cleanUser.uid).set(data).await()
                 firestore.collection("usernames").document(cleanUser.username).set(mapOf("uid" to cleanUser.uid)).await()
@@ -103,6 +175,85 @@ class FirestoreService(private val context: Context) {
         } catch (e: Exception) {
             mockUsers.value = mockUsers.value.mapValues { (uid, u) ->
                 if (uid == userId) u.copy(photoUrl = photoUrl) else u
+            }
+            Result.success(Unit)
+        }
+    }
+
+    suspend fun updateUserSnapProfile(
+        userId: String,
+        displayName: String,
+        statusText: String,
+        zodiacSign: String,
+        bitmojiSkin: String,
+        bitmojiHair: String,
+        bitmojiHairColor: String,
+        bitmojiOutfit: String,
+        bitmojiOutfitColor: String,
+        bitmojiMood: String,
+        bitmojiAccessory: String,
+        bitmojiBackground: String,
+        bitmojiPose: String
+    ): Result<Unit> {
+        val updates = mapOf(
+            "displayName" to displayName,
+            "statusText" to statusText,
+            "zodiacSign" to zodiacSign,
+            "bitmojiSkin" to bitmojiSkin,
+            "bitmojiHair" to bitmojiHair,
+            "bitmojiHairColor" to bitmojiHairColor,
+            "bitmojiOutfit" to bitmojiOutfit,
+            "bitmojiOutfitColor" to bitmojiOutfitColor,
+            "bitmojiMood" to bitmojiMood,
+            "bitmojiAccessory" to bitmojiAccessory,
+            "bitmojiBackground" to bitmojiBackground,
+            "bitmojiPose" to bitmojiPose,
+            "hasCustomBitmoji" to true
+        )
+        return try {
+            val firestore = db
+            if (firestore != null) {
+                firestore.collection("users").document(userId).update(updates).await()
+            }
+            mockUsers.value = mockUsers.value.mapValues { (uid, u) ->
+                if (uid == userId) {
+                    u.copy(
+                        displayName = displayName.ifBlank { u.displayName },
+                        statusText = statusText.ifBlank { u.statusText },
+                        zodiacSign = zodiacSign,
+                        bitmojiSkin = bitmojiSkin,
+                        bitmojiHair = bitmojiHair,
+                        bitmojiHairColor = bitmojiHairColor,
+                        bitmojiOutfit = bitmojiOutfit,
+                        bitmojiOutfitColor = bitmojiOutfitColor,
+                        bitmojiMood = bitmojiMood,
+                        bitmojiAccessory = bitmojiAccessory,
+                        bitmojiBackground = bitmojiBackground,
+                        bitmojiPose = bitmojiPose,
+                        hasCustomBitmoji = true
+                    )
+                } else u
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            mockUsers.value = mockUsers.value.mapValues { (uid, u) ->
+                if (uid == userId) {
+                    u.copy(
+                        displayName = displayName.ifBlank { u.displayName },
+                        statusText = statusText.ifBlank { u.statusText },
+                        zodiacSign = zodiacSign,
+                        bitmojiSkin = bitmojiSkin,
+                        bitmojiHair = bitmojiHair,
+                        bitmojiHairColor = bitmojiHairColor,
+                        bitmojiOutfit = bitmojiOutfit,
+                        bitmojiOutfitColor = bitmojiOutfitColor,
+                        bitmojiMood = bitmojiMood,
+                        bitmojiAccessory = bitmojiAccessory,
+                        bitmojiBackground = bitmojiBackground,
+                        bitmojiPose = bitmojiPose,
+                        hasCustomBitmoji = true
+                    )
+                } else u
             }
             Result.success(Unit)
         }
@@ -139,7 +290,20 @@ class FirestoreService(private val context: Context) {
                             lastSeen = doc.getLong("lastSeen") ?: System.currentTimeMillis(),
                             isBanned = doc.getBoolean("isBanned") ?: false,
                             warningCount = doc.getLong("warningCount")?.toInt() ?: 0,
-                            createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                            createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                            snapScore = doc.getLong("snapScore")?.toInt() ?: 1420,
+                            snapStreaks = doc.getLong("snapStreaks")?.toInt() ?: 7,
+                            zodiacSign = doc.getString("zodiacSign") ?: "Aries ♈",
+                            bitmojiSkin = doc.getString("bitmojiSkin") ?: "light",
+                            bitmojiHair = doc.getString("bitmojiHair") ?: "fade",
+                            bitmojiHairColor = doc.getString("bitmojiHairColor") ?: "black",
+                            bitmojiOutfit = doc.getString("bitmojiOutfit") ?: "snap_hoodie",
+                            bitmojiOutfitColor = doc.getString("bitmojiOutfitColor") ?: "yellow",
+                            bitmojiMood = doc.getString("bitmojiMood") ?: "smile",
+                            bitmojiAccessory = doc.getString("bitmojiAccessory") ?: "none",
+                            bitmojiBackground = doc.getString("bitmojiBackground") ?: "sunset",
+                            bitmojiPose = doc.getString("bitmojiPose") ?: "peace",
+                            hasCustomBitmoji = doc.getBoolean("hasCustomBitmoji") ?: true
                         )
                     } catch (e: Exception) {
                         null
@@ -158,15 +322,19 @@ class FirestoreService(private val context: Context) {
     }
 
     suspend fun searchUserByUsername(query: String): List<User> {
-        val clean = query.trim().lowercase()
-        if (clean.isBlank()) return emptyList()
+        val clean = query.trim().lowercase().removePrefix("@")
         val firestore = db
         if (firestore != null) {
             try {
-                val snap = firestore.collection("users")
-                    .whereGreaterThanOrEqualTo("username", clean)
-                    .whereLessThanOrEqualTo("username", clean + "\uf8ff")
-                    .get().await()
+                val q = if (clean.isBlank()) {
+                    firestore.collection("users").limit(10)
+                } else {
+                    firestore.collection("users")
+                        .whereGreaterThanOrEqualTo("username", clean)
+                        .whereLessThanOrEqualTo("username", clean + "\uf8ff")
+                        .limit(20)
+                }
+                val snap = q.get().await()
                 val list = snap.documents.mapNotNull { doc ->
                     val email = doc.getString("email") ?: ""
                     val roleStr = doc.getString("role") ?: UserRole.STANDARD.name
@@ -193,15 +361,54 @@ class FirestoreService(private val context: Context) {
                 Log.w(TAG, "Search query error: ${e.message}")
             }
         }
-        return mockUsers.value.values.filter {
-            it.username.contains(clean, ignoreCase = true) || it.displayName.contains(clean, ignoreCase = true)
+        return if (clean.isBlank()) {
+            mockUsers.value.values.toList()
+        } else {
+            mockUsers.value.values.filter {
+                it.username.contains(clean, ignoreCase = true) || it.displayName.contains(clean, ignoreCase = true)
+            }
         }
     }
 
     // --- Friends & Friend Requests ---
     suspend fun sendFriendRequest(fromUser: User, toUsername: String): Result<String> {
-        val target = mockUsers.value.values.find { it.username.equals(toUsername, ignoreCase = true) }
-            ?: return Result.failure(Exception("User @$toUsername not found"))
+        val cleanToUsername = toUsername.trim().lowercase().removePrefix("@")
+        var target = mockUsers.value.values.find { it.username.equals(cleanToUsername, ignoreCase = true) }
+        
+        val firestore = db
+        if (target == null && firestore != null) {
+            try {
+                val querySnap = firestore.collection("users")
+                    .whereEqualTo("username", cleanToUsername)
+                    .limit(1)
+                    .get()
+                    .await()
+                val doc = querySnap.documents.firstOrNull()
+                if (doc != null) {
+                    val email = doc.getString("email") ?: ""
+                    val roleStr = doc.getString("role") ?: UserRole.STANDARD.name
+                    val parsedRole = try { UserRole.valueOf(roleStr) } catch (_: Exception) { UserRole.STANDARD }
+                    target = User(
+                        uid = doc.getString("uid") ?: doc.id,
+                        email = email,
+                        username = doc.getString("username") ?: cleanToUsername,
+                        displayName = doc.getString("displayName") ?: cleanToUsername,
+                        statusText = doc.getString("statusText") ?: "Active on TextFlow",
+                        photoUrl = doc.getString("photoUrl") ?: "",
+                        role = parsedRole,
+                        isOnline = doc.getBoolean("isOnline") ?: false,
+                        lastSeen = doc.getLong("lastSeen") ?: System.currentTimeMillis()
+                    )
+                    mockUsers.value = mockUsers.value + (target.uid to target)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query user by username from Firestore: ${e.message}")
+            }
+        }
+
+        if (target == null) {
+            return Result.failure(Exception("User @$cleanToUsername not found"))
+        }
 
         if (target.uid == fromUser.uid) {
             return Result.failure(Exception("You cannot add yourself as a friend"))
@@ -209,10 +416,10 @@ class FirestoreService(private val context: Context) {
 
         val currentFriends = mockFriends.value[fromUser.uid] ?: emptySet()
         if (currentFriends.contains(target.uid)) {
-            return Result.failure(Exception("Already friends with @$toUsername"))
+            return Result.failure(Exception("Already friends with @$cleanToUsername"))
         }
 
-        val requestId = "req_${System.currentTimeMillis()}"
+        val requestId = "req_${System.currentTimeMillis()}_${(100..999).random()}"
         val request = FriendRequest(
             id = requestId,
             fromUid = fromUser.uid,
@@ -225,31 +432,75 @@ class FirestoreService(private val context: Context) {
             status = RequestStatus.PENDING
         )
 
-        val firestore = db
         if (firestore != null) {
             try {
-                firestore.collection("friend_requests").document(requestId).set(request).await()
+                val reqMap = mapOf(
+                    "id" to request.id,
+                    "fromUid" to request.fromUid,
+                    "fromUsername" to request.fromUsername,
+                    "fromDisplayName" to request.fromDisplayName,
+                    "fromPhotoUrl" to request.fromPhotoUrl,
+                    "toUid" to request.toUid,
+                    "toUsername" to request.toUsername,
+                    "timestamp" to request.timestamp,
+                    "status" to request.status.name
+                )
+                firestore.collection("friend_requests").document(requestId).set(reqMap).await()
             } catch (e: Exception) {
                 Log.w(TAG, "Firestore send request failed: ${e.message}")
             }
         }
 
         mockFriendRequests.value = mockFriendRequests.value + request
-        return Result.success("Friend request sent to @$toUsername")
+        return Result.success("Friend request sent to @$cleanToUsername")
     }
 
     fun getPendingRequestsFlow(userId: String): Flow<List<FriendRequest>> = callbackFlow {
+        if (mockFriendRequests.value.none { it.toUid == userId }) {
+            val seedReq = FriendRequest(
+                id = "req_seed_alex_${userId}",
+                fromUid = "user_alex",
+                fromUsername = "alex",
+                fromDisplayName = "Alex Rivera",
+                fromPhotoUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                toUid = userId,
+                toUsername = "",
+                timestamp = System.currentTimeMillis() - 1000 * 60 * 30,
+                status = RequestStatus.PENDING
+            )
+            mockFriendRequests.value = mockFriendRequests.value + seedReq
+        }
         val firestore = db
         var registration: ListenerRegistration? = null
         if (firestore != null) {
             registration = firestore.collection("friend_requests")
                 .whereEqualTo("toUid", userId)
                 .whereEqualTo("status", RequestStatus.PENDING.name)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null) {
-                        val reqs = snapshot.toObjects(FriendRequest::class.java)
-                        trySend(reqs)
+                .addSnapshotListener { snapshot, error ->
+                    val memReqs = mockFriendRequests.value.filter { it.toUid == userId && it.status == RequestStatus.PENDING }
+                    if (error != null || snapshot == null) {
+                        trySend(memReqs)
+                        return@addSnapshotListener
                     }
+                    val cloudReqs = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.getString("id") ?: doc.id
+                            val fUid = doc.getString("fromUid") ?: ""
+                            val fUser = doc.getString("fromUsername") ?: ""
+                            val fName = doc.getString("fromDisplayName") ?: fUser
+                            val fPhoto = doc.getString("fromPhotoUrl") ?: ""
+                            val tUid = doc.getString("toUid") ?: ""
+                            val tUser = doc.getString("toUsername") ?: ""
+                            val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                            val stStr = doc.getString("status") ?: RequestStatus.PENDING.name
+                            val st = try { RequestStatus.valueOf(stStr) } catch (_: Exception) { RequestStatus.PENDING }
+                            FriendRequest(id, fUid, fUser, fName, fPhoto, tUid, tUser, ts, st)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    val merged = (cloudReqs + memReqs).distinctBy { it.id }.sortedByDescending { it.timestamp }
+                    trySend(merged)
                 }
         } else {
             val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -270,9 +521,34 @@ class FirestoreService(private val context: Context) {
             try {
                 firestore.collection("friend_requests").document(request.id)
                     .update("status", newStatus.name).await()
+
                 if (accept) {
-                    firestore.collection("friends").document("${request.fromUid}_${request.toUid}")
-                        .set(mapOf("userA" to request.fromUid, "userB" to request.toUid, "active" to true)).await()
+                    val userA = request.fromUid
+                    val userB = request.toUid
+
+                    val friendDataForA = mapOf(
+                        "uid" to userB,
+                        "username" to request.toUsername,
+                        "displayName" to (mockUsers.value[userB]?.displayName ?: request.toUsername),
+                        "photoUrl" to (mockUsers.value[userB]?.photoUrl ?: ""),
+                        "statusText" to (mockUsers.value[userB]?.statusText ?: "Active on TextFlow"),
+                        "role" to (mockUsers.value[userB]?.role?.name ?: UserRole.STANDARD.name),
+                        "addedAt" to System.currentTimeMillis()
+                    )
+                    val friendDataForB = mapOf(
+                        "uid" to userA,
+                        "username" to request.fromUsername,
+                        "displayName" to request.fromDisplayName,
+                        "photoUrl" to request.fromPhotoUrl,
+                        "statusText" to (mockUsers.value[userA]?.statusText ?: "Active on TextFlow"),
+                        "role" to UserRole.STANDARD.name,
+                        "addedAt" to System.currentTimeMillis()
+                    )
+
+                    firestore.collection("users").document(userA).collection("friends").document(userB).set(friendDataForA).await()
+                    firestore.collection("users").document(userB).collection("friends").document(userA).set(friendDataForB).await()
+                    firestore.collection("friends").document("${userA}_${userB}")
+                        .set(mapOf("userA" to userA, "userB" to userB, "active" to true)).await()
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Respond friend request error: ${e.message}")
@@ -293,28 +569,89 @@ class FirestoreService(private val context: Context) {
     }
 
     fun getFriendsFlow(userId: String): Flow<List<Friend>> = callbackFlow {
-        val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
-            mockFriends.collect { friendsMap ->
-                val friendUids = friendsMap[userId] ?: emptySet()
-                val allUsers = mockUsers.value
-                val friendList = friendUids.mapNotNull { fUid ->
-                    allUsers[fUid]?.let { u ->
-                        Friend(
-                            uid = u.uid,
-                            username = u.username,
-                            displayName = u.displayName,
-                            statusText = u.statusText,
-                            photoUrl = u.photoUrl,
-                            role = u.role,
-                            isOnline = u.isOnline,
-                            lastSeen = u.lastSeen
-                        )
+        val firestore = db
+        var registration: ListenerRegistration? = null
+        if (firestore != null) {
+            registration = firestore.collection("users")
+                .document(userId)
+                .collection("friends")
+                .addSnapshotListener { snapshot, error ->
+                    val memFriends = run {
+                        val friendUids = mockFriends.value[userId] ?: emptySet()
+                        val allUsers = mockUsers.value
+                        friendUids.mapNotNull { fUid ->
+                            allUsers[fUid]?.let { u ->
+                                Friend(
+                                    uid = u.uid,
+                                    username = u.username,
+                                    displayName = u.displayName,
+                                    statusText = u.statusText,
+                                    photoUrl = u.photoUrl,
+                                    role = u.role,
+                                    isOnline = u.isOnline,
+                                    lastSeen = u.lastSeen
+                                )
+                            }
+                        }
                     }
+
+                    if (error != null || snapshot == null) {
+                        trySend(memFriends)
+                        return@addSnapshotListener
+                    }
+
+                    val cloudFriends = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val uid = doc.getString("uid") ?: doc.id
+                            val username = doc.getString("username") ?: ""
+                            val displayName = doc.getString("displayName") ?: username
+                            val statusText = doc.getString("statusText") ?: "Active on TextFlow"
+                            val photoUrl = doc.getString("photoUrl") ?: ""
+                            val roleStr = doc.getString("role") ?: UserRole.STANDARD.name
+                            val role = try { UserRole.valueOf(roleStr) } catch (_: Exception) { UserRole.STANDARD }
+                            Friend(
+                                uid = uid,
+                                username = username,
+                                displayName = displayName,
+                                statusText = statusText,
+                                role = role,
+                                isOnline = true,
+                                photoUrl = photoUrl
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+
+                    val merged = (cloudFriends + memFriends).distinctBy { it.uid }
+                    trySend(merged)
                 }
-                trySend(friendList)
+        } else {
+            val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                mockFriends.collect { friendsMap ->
+                    val friendUids = friendsMap[userId] ?: emptySet()
+                    val allUsers = mockUsers.value
+                    val friendList = friendUids.mapNotNull { fUid ->
+                        allUsers[fUid]?.let { u ->
+                            Friend(
+                                uid = u.uid,
+                                username = u.username,
+                                displayName = u.displayName,
+                                statusText = u.statusText,
+                                photoUrl = u.photoUrl,
+                                role = u.role,
+                                isOnline = u.isOnline,
+                                lastSeen = u.lastSeen
+                            )
+                        }
+                    }
+                    trySend(friendList)
+                }
             }
+            awaitClose { job.cancel() }
+            return@callbackFlow
         }
-        awaitClose { job.cancel() }
+        awaitClose { registration?.remove() }
     }
 
     // --- Direct Messaging ---
@@ -322,11 +659,25 @@ class FirestoreService(private val context: Context) {
         val firestore = db
         if (firestore != null) {
             try {
+                val data = mapOf(
+                    "id" to message.id,
+                    "chatId" to message.chatId,
+                    "senderId" to message.senderId,
+                    "senderUsername" to message.senderUsername,
+                    "senderDisplayName" to message.senderDisplayName,
+                    "recipientId" to message.recipientId,
+                    "text" to message.text,
+                    "timestamp" to message.timestamp,
+                    "deliveryMode" to message.deliveryMode.name,
+                    "status" to message.status.name,
+                    "upvotedBy" to message.upvotedBy,
+                    "downvotedBy" to message.downvotedBy
+                )
                 firestore.collection("chats")
                     .document(message.chatId)
                     .collection("messages")
                     .document(message.id)
-                    .set(message)
+                    .set(data)
                     .await()
             } catch (e: Exception) {
                 Log.w(TAG, "Firestore send msg error: ${e.message}")
@@ -335,6 +686,108 @@ class FirestoreService(private val context: Context) {
 
         val existing = mockMessages.value[message.chatId] ?: emptyList()
         mockMessages.value = mockMessages.value + (message.chatId to (existing + message))
+
+        // Community friends simulated reply for interactive Facebook-style conversation
+        if (message.recipientId == "user_alex" || message.recipientId == "user_sam" || message.recipientId == "user_jordan" || message.recipientId == "user_elena") {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                kotlinx.coroutines.delay(1200)
+                val peerUser = mockUsers.value[message.recipientId]
+                val replyText = when {
+                    message.text.contains("hi", ignoreCase = true) || message.text.contains("hello", ignoreCase = true) || message.text.contains("hey", ignoreCase = true) ->
+                        "Hey there! Great to connect with you on Kaiser! How's your day going? 😊"
+                    message.text.contains("how are you", ignoreCase = true) ->
+                        "I'm doing great, thanks for asking! Loving the new friend & group features here on Kaiser 🚀"
+                    message.text.contains("photo", ignoreCase = true) || message.text.contains("snap", ignoreCase = true) || message.text.contains("kicon", ignoreCase = true) ->
+                        "Your Kicon avatar and card look super clean! ✨"
+                    else ->
+                        "Got your message! So awesome we can talk freely here just like Facebook friends! 🔥"
+                }
+                val replyMsg = ChatMessage(
+                    id = "reply_${System.currentTimeMillis()}_${(100..999).random()}",
+                    chatId = message.chatId,
+                    senderId = message.recipientId,
+                    senderUsername = peerUser?.username ?: "friend",
+                    senderDisplayName = peerUser?.displayName ?: "Friend",
+                    recipientId = message.senderId,
+                    text = replyText,
+                    timestamp = System.currentTimeMillis(),
+                    deliveryMode = DeliveryMode.CLOUD_REALTIME,
+                    status = MessageStatus.SENT
+                )
+                val current = mockMessages.value[message.chatId] ?: emptyList()
+                mockMessages.value = mockMessages.value + (message.chatId to (current + replyMsg))
+            }
+        }
+
+        return Result.success(Unit)
+    }
+
+    suspend fun voteChatMessage(chatId: String, messageId: String, userId: String, isUpvote: Boolean): Result<Unit> {
+        val currentMsgs = mockMessages.value[chatId] ?: emptyList()
+        val targetMsg = currentMsgs.find { it.id == messageId }
+
+        var newUpvoted = targetMsg?.upvotedBy ?: emptyList()
+        var newDownvoted = targetMsg?.downvotedBy ?: emptyList()
+
+        if (isUpvote) {
+            if (newUpvoted.contains(userId)) {
+                newUpvoted = newUpvoted - userId
+            } else {
+                newUpvoted = newUpvoted + userId
+                newDownvoted = newDownvoted - userId
+            }
+        } else {
+            if (newDownvoted.contains(userId)) {
+                newDownvoted = newDownvoted - userId
+            } else {
+                newDownvoted = newDownvoted + userId
+                newUpvoted = newUpvoted - userId
+            }
+        }
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                firestore.collection("chats")
+                    .document(chatId)
+                    .collection("messages")
+                    .document(messageId)
+                    .update(mapOf("upvotedBy" to newUpvoted, "downvotedBy" to newDownvoted))
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Firestore voteChatMessage error: ${e.message}")
+            }
+        }
+
+        mockMessages.value = mockMessages.value.mapValues { (cId, list) ->
+            if (cId == chatId) {
+                list.map { m ->
+                    if (m.id == messageId) m.copy(upvotedBy = newUpvoted, downvotedBy = newDownvoted) else m
+                }
+            } else list
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun clearChatMessages(chatId: String): Result<Unit> {
+        val firestore = db
+        if (firestore != null) {
+            try {
+                val snapshot = firestore.collection("chats")
+                    .document(chatId)
+                    .collection("messages")
+                    .get()
+                    .await()
+                val batch = firestore.batch()
+                for (doc in snapshot.documents) {
+                    batch.delete(doc.reference)
+                }
+                batch.commit().await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed clearing Firestore messages: ${e.message}")
+            }
+        }
+        mockMessages.value = mockMessages.value - chatId
         return Result.success(Unit)
     }
 
@@ -347,12 +800,33 @@ class FirestoreService(private val context: Context) {
                 .collection("messages")
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener { snapshot, error ->
+                    val memMsgs = mockMessages.value[chatId] ?: emptyList()
                     if (error != null || snapshot == null) {
-                        trySend(mockMessages.value[chatId] ?: emptyList())
+                        trySend(memMsgs)
                         return@addSnapshotListener
                     }
-                    val msgs = snapshot.toObjects(ChatMessage::class.java)
-                    trySend(msgs)
+                    val cloudMsgs = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.getString("id") ?: doc.id
+                            val sId = doc.getString("senderId") ?: ""
+                            val sUser = doc.getString("senderUsername") ?: ""
+                            val sName = doc.getString("senderDisplayName") ?: sUser
+                            val rId = doc.getString("recipientId") ?: ""
+                            val text = doc.getString("text") ?: ""
+                            val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                            val dModeStr = doc.getString("deliveryMode") ?: DeliveryMode.CLOUD_REALTIME.name
+                            val dMode = try { DeliveryMode.valueOf(dModeStr) } catch (_: Exception) { DeliveryMode.CLOUD_REALTIME }
+                            val stStr = doc.getString("status") ?: MessageStatus.SENT.name
+                            val st = try { MessageStatus.valueOf(stStr) } catch (_: Exception) { MessageStatus.SENT }
+                            val upvoted = (doc.get("upvotedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            val downvoted = (doc.get("downvotedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            ChatMessage(id, chatId, sId, sUser, sName, rId, text, ts, dMode, st, upvoted, downvoted)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    val merged = (cloudMsgs + memMsgs).distinctBy { it.id }.sortedBy { it.timestamp }
+                    trySend(merged)
                 }
         } else {
             val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -371,13 +845,52 @@ class FirestoreService(private val context: Context) {
         val firestore = db
         if (firestore != null) {
             try {
-                firestore.collection("groups").document(group.id).set(group).await()
+                val groupMap = mapOf(
+                    "id" to group.id,
+                    "name" to group.name,
+                    "description" to group.description,
+                    "creatorId" to group.creatorId,
+                    "creatorUsername" to group.creatorUsername,
+                    "memberIds" to group.memberIds,
+                    "memberUsernames" to group.memberUsernames,
+                    "iconUrl" to group.iconUrl,
+                    "lastMessageText" to group.lastMessageText,
+                    "lastMessageSender" to group.lastMessageSender,
+                    "lastMessageTimestamp" to group.lastMessageTimestamp,
+                    "createdAt" to group.createdAt
+                )
+                firestore.collection("groups").document(group.id).set(groupMap).await()
             } catch (e: Exception) {
                 Log.w(TAG, "Firestore createGroupChat failed: ${e.message}")
             }
         }
         mockGroupChats.value = listOf(group) + mockGroupChats.value
         return Result.success(group.id)
+    }
+
+    suspend fun addMembersToGroup(groupId: String, newMembers: List<Friend>): Result<Unit> {
+        val newUids = newMembers.map { it.uid }
+        val newNames = newMembers.map { it.username }
+        val firestore = db
+        if (firestore != null) {
+            try {
+                firestore.collection("groups").document(groupId)
+                    .update(
+                        "memberIds", FieldValue.arrayUnion(*newUids.toTypedArray()),
+                        "memberUsernames", FieldValue.arrayUnion(*newNames.toTypedArray())
+                    ).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Firestore addMembersToGroup failed: ${e.message}")
+            }
+        }
+        mockGroupChats.value = mockGroupChats.value.map { g ->
+            if (g.id == groupId) {
+                val updatedIds = (g.memberIds + newUids).distinct()
+                val updatedNames = (g.memberUsernames + newNames).distinct()
+                g.copy(memberIds = updatedIds, memberUsernames = updatedNames)
+            } else g
+        }
+        return Result.success(Unit)
     }
 
     fun getGroupChatsFlow(userId: String): Flow<List<GroupChat>> = callbackFlow {
@@ -387,12 +900,34 @@ class FirestoreService(private val context: Context) {
             registration = firestore.collection("groups")
                 .whereArrayContains("memberIds", userId)
                 .addSnapshotListener { snapshot, error ->
+                    val memGroups = mockGroupChats.value.filter { it.memberIds.contains(userId) }
                     if (error != null || snapshot == null) {
-                        trySend(mockGroupChats.value.filter { it.memberIds.contains(userId) })
+                        trySend(memGroups)
                         return@addSnapshotListener
                     }
-                    val groups = snapshot.toObjects(GroupChat::class.java)
-                    trySend(groups)
+                    val cloudGroups = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.getString("id") ?: doc.id
+                            val name = doc.getString("name") ?: ""
+                            val desc = doc.getString("description") ?: ""
+                            val cId = doc.getString("creatorId") ?: ""
+                            val cUser = doc.getString("creatorUsername") ?: ""
+                            @Suppress("UNCHECKED_CAST")
+                            val mIds = (doc.get("memberIds") as? List<String>) ?: emptyList()
+                            @Suppress("UNCHECKED_CAST")
+                            val mUsers = (doc.get("memberUsernames") as? List<String>) ?: emptyList()
+                            val icon = doc.getString("iconUrl") ?: ""
+                            val lastMsg = doc.getString("lastMessageText") ?: ""
+                            val lastSender = doc.getString("lastMessageSender") ?: ""
+                            val lastTs = doc.getLong("lastMessageTimestamp") ?: 0L
+                            val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                            GroupChat(id, name, desc, cId, cUser, mIds, mUsers, icon, lastMsg, lastSender, lastTs, createdAt)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    val merged = (cloudGroups + memGroups).distinctBy { it.id }.sortedByDescending { it.lastMessageTimestamp }
+                    trySend(merged)
                 }
         } else {
             val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -415,12 +950,30 @@ class FirestoreService(private val context: Context) {
                 .collection("messages")
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener { snapshot, error ->
+                    val memMsgs = mockGroupMessages.value[groupId] ?: emptyList()
                     if (error != null || snapshot == null) {
-                        trySend(mockGroupMessages.value[groupId] ?: emptyList())
+                        trySend(memMsgs)
                         return@addSnapshotListener
                     }
-                    val msgs = snapshot.toObjects(GroupMessage::class.java)
-                    trySend(msgs)
+                    val cloudMsgs = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.getString("id") ?: doc.id
+                            val gId = doc.getString("groupId") ?: groupId
+                            val sId = doc.getString("senderId") ?: ""
+                            val sUser = doc.getString("senderUsername") ?: ""
+                            val sName = doc.getString("senderDisplayName") ?: sUser
+                            val sPhoto = doc.getString("senderPhotoUrl") ?: ""
+                            val text = doc.getString("text") ?: ""
+                            val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                            val upvoted = (doc.get("upvotedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            val downvoted = (doc.get("downvotedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            GroupMessage(id, gId, sId, sUser, sName, sPhoto, text, ts, upvoted, downvoted)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    val merged = (cloudMsgs + memMsgs).distinctBy { it.id }.sortedBy { it.timestamp }
+                    trySend(merged)
                 }
         } else {
             val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -438,11 +991,23 @@ class FirestoreService(private val context: Context) {
         val firestore = db
         if (firestore != null) {
             try {
+                val data = mapOf(
+                    "id" to message.id,
+                    "groupId" to message.groupId,
+                    "senderId" to message.senderId,
+                    "senderUsername" to message.senderUsername,
+                    "senderDisplayName" to message.senderDisplayName,
+                    "senderPhotoUrl" to message.senderPhotoUrl,
+                    "text" to message.text,
+                    "timestamp" to message.timestamp,
+                    "upvotedBy" to message.upvotedBy,
+                    "downvotedBy" to message.downvotedBy
+                )
                 firestore.collection("groups")
                     .document(message.groupId)
                     .collection("messages")
                     .document(message.id)
-                    .set(message)
+                    .set(data)
                     .await()
 
                 firestore.collection("groups")
@@ -470,6 +1035,53 @@ class FirestoreService(private val context: Context) {
                     lastMessageTimestamp = message.timestamp
                 )
             } else g
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun voteGroupMessage(groupId: String, messageId: String, userId: String, isUpvote: Boolean): Result<Unit> {
+        val currentMsgs = mockGroupMessages.value[groupId] ?: emptyList()
+        val targetMsg = currentMsgs.find { it.id == messageId }
+
+        var newUpvoted = targetMsg?.upvotedBy ?: emptyList()
+        var newDownvoted = targetMsg?.downvotedBy ?: emptyList()
+
+        if (isUpvote) {
+            if (newUpvoted.contains(userId)) {
+                newUpvoted = newUpvoted - userId
+            } else {
+                newUpvoted = newUpvoted + userId
+                newDownvoted = newDownvoted - userId
+            }
+        } else {
+            if (newDownvoted.contains(userId)) {
+                newDownvoted = newDownvoted - userId
+            } else {
+                newDownvoted = newDownvoted + userId
+                newUpvoted = newUpvoted - userId
+            }
+        }
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                firestore.collection("groups")
+                    .document(groupId)
+                    .collection("messages")
+                    .document(messageId)
+                    .update(mapOf("upvotedBy" to newUpvoted, "downvotedBy" to newDownvoted))
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Firestore voteGroupMessage error: ${e.message}")
+            }
+        }
+
+        mockGroupMessages.value = mockGroupMessages.value.mapValues { (gId, list) ->
+            if (gId == groupId) {
+                list.map { m ->
+                    if (m.id == messageId) m.copy(upvotedBy = newUpvoted, downvotedBy = newDownvoted) else m
+                }
+            } else list
         }
         return Result.success(Unit)
     }

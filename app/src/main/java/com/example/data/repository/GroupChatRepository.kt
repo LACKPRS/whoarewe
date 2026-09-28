@@ -63,4 +63,12 @@ class GroupChatRepository(
         )
         return firestoreService.sendGroupMessage(message)
     }
+
+    suspend fun voteGroupMessage(groupId: String, messageId: String, userId: String, isUpvote: Boolean): Result<Unit> {
+        return firestoreService.voteGroupMessage(groupId, messageId, userId, isUpvote)
+    }
+
+    suspend fun addMembersToGroup(groupId: String, newMembers: List<Friend>): Result<Unit> {
+        return firestoreService.addMembersToGroup(groupId, newMembers)
+    }
 }

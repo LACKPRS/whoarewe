@@ -84,6 +84,7 @@ fun SettingsScreen(
     onSimulateTestLocalPeer: () -> Unit = {},
     onSimulateTestVoipCall: () -> Unit = {},
     onTestPushNotification: (type: String) -> Unit = {},
+    onNavigateSnapProfile: () -> Unit = {},
     onSignOut: () -> Unit,
     firebaseStatusText: String,
     localChatPort: Int,
@@ -119,51 +120,6 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-            // Appearance & Dynamic Dark Mode
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ThemeOptionCard(
-                            label = "Dark",
-                            icon = Icons.Default.DarkMode,
-                            isSelected = themeMode == ThemeMode.DARK,
-                            onClick = { onSelectThemeMode(ThemeMode.DARK) },
-                            modifier = Modifier.weight(1f).testTag("theme_btn_dark")
-                        )
-                        ThemeOptionCard(
-                            label = "Light",
-                            icon = Icons.Default.LightMode,
-                            isSelected = themeMode == ThemeMode.LIGHT,
-                            onClick = { onSelectThemeMode(ThemeMode.LIGHT) },
-                            modifier = Modifier.weight(1f).testTag("theme_btn_light")
-                        )
-                        ThemeOptionCard(
-                            label = "System",
-                            icon = Icons.Default.SettingsBrightness,
-                            isSelected = themeMode == ThemeMode.SYSTEM,
-                            onClick = { onSelectThemeMode(ThemeMode.SYSTEM) },
-                            modifier = Modifier.weight(1f).testTag("theme_btn_system")
-                        )
-                    }
-                }
-            }
 
             // User Identity & Role Card
             Card(
@@ -219,6 +175,109 @@ fun SettingsScreen(
                 }
             }
 
+            // Kicon Custom Profile Studio Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.SnapchatYellow),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(2.dp, com.example.ui.theme.SnapchatBlack, RoundedCornerShape(16.dp))
+                    .clickable { onNavigateSnapProfile() }
+                    .testTag("kicon_profile_banner")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "✨ KICON PROFILE STUDIO",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp,
+                                    color = com.example.ui.theme.SnapchatBlack
+                                )
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(com.example.ui.theme.SnapchatBlack)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = currentUser.zodiacSign,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        com.example.ui.components.BitmojiAvatar(
+                            skin = currentUser.bitmojiSkin,
+                            hair = currentUser.bitmojiHair,
+                            hairColor = currentUser.bitmojiHairColor,
+                            outfit = currentUser.bitmojiOutfit,
+                            outfitColor = currentUser.bitmojiOutfitColor,
+                            mood = currentUser.bitmojiMood,
+                            accessory = currentUser.bitmojiAccessory,
+                            background = currentUser.bitmojiBackground,
+                            pose = currentUser.bitmojiPose,
+                            size = 64.dp,
+                            showBackground = true,
+                            isCircle = true
+                        )
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Create & Customize Kicon",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    color = com.example.ui.theme.SnapchatBlack
+                                )
+                            )
+                            Text(
+                                text = "Kicon Card, 3D Avatar, outfits, pose, score (${currentUser.snapScore}) & streaks (🔥 ${currentUser.snapStreaks})",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = com.example.ui.theme.SnapchatBlack.copy(alpha = 0.85f),
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = onNavigateSnapProfile,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = com.example.ui.theme.SnapchatBlack,
+                            contentColor = com.example.ui.theme.SnapchatYellow
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_kicon_studio_button")
+                    ) {
+                        Text("Customize Kicon Profile & Avatar", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+
             // Profile Customization
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -239,6 +298,7 @@ fun SettingsScreen(
                         UserAvatar(
                             photoUrl = currentUser.photoUrl,
                             displayName = currentUser.displayName,
+                            user = currentUser,
                             size = 64.dp
                         )
 

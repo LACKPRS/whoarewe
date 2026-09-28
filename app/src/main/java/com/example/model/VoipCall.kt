@@ -7,6 +7,7 @@ data class LocalPeer(
     val hostAddress: String,
     val port: Int,
     val voipPort: Int,
+    val uid: String = "",
     val lastSeenTimestamp: Long = System.currentTimeMillis()
 )
 

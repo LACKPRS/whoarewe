@@ -16,6 +16,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
+
+      match /friends/{friendId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // Username reservation & handle lookup
@@ -33,7 +37,15 @@ service cloud.firestore {
       }
     }
 
-    // Group Chats & Channels
+    // Group Chats & Channels (both groups and group_chats paths)
+    match /groups/{groupId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
     match /group_chats/{groupId} {
       allow read, write: if isAuthenticated();
       

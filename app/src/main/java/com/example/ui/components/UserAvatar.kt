@@ -37,6 +37,14 @@ fun UserAvatar(
     isEditable: Boolean = false,
     hasStoryRing: Boolean = false,
     storyRingColors: List<Color> = StoryGradientColors,
+    user: com.example.model.User? = null,
+    bitmojiSkin: String? = null,
+    bitmojiHair: String? = null,
+    bitmojiHairColor: String? = null,
+    bitmojiOutfit: String? = null,
+    bitmojiOutfitColor: String? = null,
+    bitmojiMood: String? = null,
+    bitmojiAccessory: String? = null,
     onEditClick: () -> Unit = {}
 ) {
     val initial = displayName.trim().take(1).ifBlank { "?" }.uppercase()
@@ -44,6 +52,15 @@ fun UserAvatar(
 
     val outerSize = if (hasStoryRing) size + 6.dp else size
     val innerSize = size
+
+    val effectiveSkin = bitmojiSkin ?: user?.bitmojiSkin ?: "light"
+    val effectiveHair = bitmojiHair ?: user?.bitmojiHair ?: "fade"
+    val effectiveHairColor = bitmojiHairColor ?: user?.bitmojiHairColor ?: "black"
+    val effectiveOutfit = bitmojiOutfit ?: user?.bitmojiOutfit ?: "snap_hoodie"
+    val effectiveOutfitColor = bitmojiOutfitColor ?: user?.bitmojiOutfitColor ?: "yellow"
+    val effectiveMood = bitmojiMood ?: user?.bitmojiMood ?: "smile"
+    val effectiveAccessory = bitmojiAccessory ?: user?.bitmojiAccessory ?: "none"
+    val showBitmoji = user?.hasCustomBitmoji == true || photoUrl?.startsWith("bitmoji://") == true || (photoUrl.isNullOrBlank() && bitmojiSkin != null)
 
     Box(
         modifier = modifier.size(outerSize),
@@ -66,7 +83,7 @@ fun UserAvatar(
             modifier = Modifier.size(innerSize),
             contentAlignment = Alignment.Center
         ) {
-            if (!photoUrl.isNullOrBlank()) {
+            if (!photoUrl.isNullOrBlank() && !photoUrl.startsWith("bitmoji://")) {
                 SubcomposeAsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(photoUrl)
@@ -88,6 +105,19 @@ fun UserAvatar(
                     error = {
                         DefaultMonogramAvatar(initial, innerSize, fontSize)
                     }
+                )
+            } else if (showBitmoji) {
+                BitmojiAvatar(
+                    skin = effectiveSkin,
+                    hair = effectiveHair,
+                    hairColor = effectiveHairColor,
+                    outfit = effectiveOutfit,
+                    outfitColor = effectiveOutfitColor,
+                    mood = effectiveMood,
+                    accessory = effectiveAccessory,
+                    size = innerSize,
+                    showBackground = true,
+                    isCircle = true
                 )
             } else {
                 DefaultMonogramAvatar(initial, innerSize, fontSize)

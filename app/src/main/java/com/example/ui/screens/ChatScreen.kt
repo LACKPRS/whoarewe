@@ -67,6 +67,19 @@ import com.example.model.User
 import com.example.ui.components.MinimalMessageBubble
 import com.example.ui.components.OnlineStatusDot
 import com.example.ui.theme.AccentEmerald
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import com.example.ui.theme.AccentRose
 import com.example.ui.theme.AccentSky
 
@@ -79,6 +92,8 @@ fun ChatScreen(
     onSendMessage: (text: String, preferLocal: Boolean) -> Unit,
     onStartVoipCall: (peer: Friend) -> Unit,
     onSubmitReport: (reason: String, excerpt: String) -> Unit,
+    onClearChat: () -> Unit = {},
+    onVoteMessage: (messageId: String, isUpvote: Boolean) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -86,61 +101,96 @@ fun ChatScreen(
     var preferLocalRouter by remember { mutableStateOf(peer.isLocalWifiPeer) }
     var showMenu by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showClearChatDialog by remember { mutableStateOf(false) }
+    var selectedMessageForAction by remember { mutableStateOf<ChatMessage?>(null) }
     var reportReason by remember { mutableStateOf("") }
     var reportExcerpt by remember { mutableStateOf("") }
 
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+
+    val filteredMessages = remember(messages, searchQuery) {
+        if (searchQuery.isBlank()) messages
+        else messages.filter { it.text.contains(searchQuery.trim(), ignoreCase = true) }
+    }
 
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
+        if (messages.isNotEmpty() && !isSearchActive) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box {
-                            com.example.ui.components.UserAvatar(
-                                photoUrl = peer.photoUrl,
-                                displayName = peer.displayName,
-                                size = 36.dp
-                            )
-                            OnlineStatusDot(
-                                isOnline = peer.isOnline,
-                                isLocalWifi = peer.isLocalWifiPeer,
-                                modifier = Modifier.align(Alignment.BottomEnd)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            Text(
-                                text = peer.displayName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "@${peer.username}",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                    if (isSearchActive) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search messages...") },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    if (searchQuery.isNotEmpty()) searchQuery = ""
+                                    else isSearchActive = false
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close search")
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(end = 8.dp)
+                                .testTag("chat_search_input")
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                com.example.ui.components.UserAvatar(
+                                    photoUrl = peer.photoUrl,
+                                    displayName = peer.displayName,
+                                    size = 36.dp
                                 )
-                                if (peer.isLocalWifiPeer) {
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                OnlineStatusDot(
+                                    isOnline = peer.isOnline,
+                                    isLocalWifi = peer.isLocalWifiPeer,
+                                    modifier = Modifier.align(Alignment.BottomEnd)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column {
+                                Text(
+                                    text = peer.displayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "• Wi-Fi Peer",
+                                        text = "@${peer.username}",
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            color = AccentEmerald,
-                                            fontWeight = FontWeight.Bold
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     )
+                                    if (peer.isLocalWifiPeer) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "• Wi-Fi Peer",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = AccentEmerald,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -152,45 +202,62 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    // Local Router VoIP Call Button
-                    IconButton(
-                        onClick = { onStartVoipCall(peer) },
-                        modifier = Modifier
-                            .testTag("voip_call_button")
-                            .clip(CircleShape)
-                            .background(
-                                if (peer.isLocalWifiPeer) AccentEmerald.copy(alpha = 0.2f)
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "Local VoIP Call",
-                            tint = if (peer.isLocalWifiPeer) AccentEmerald else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Box {
-                        IconButton(onClick = { showMenu = true }, modifier = Modifier.testTag("chat_menu_button")) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    if (!isSearchActive) {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search messages")
                         }
 
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
+                        // Local Router VoIP Call Button
+                        IconButton(
+                            onClick = { onStartVoipCall(peer) },
+                            modifier = Modifier
+                                .testTag("voip_call_button")
+                                .clip(CircleShape)
+                                .background(
+                                    if (peer.isLocalWifiPeer) AccentEmerald.copy(alpha = 0.2f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Report User / Chat") },
-                                onClick = {
-                                    showMenu = false
-                                    reportExcerpt = messages.lastOrNull()?.text ?: ""
-                                    showReportDialog = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Flag, contentDescription = null, tint = AccentRose)
-                                },
-                                modifier = Modifier.testTag("menu_report_chat")
+                            Icon(
+                                imageVector = Icons.Default.Call,
+                                contentDescription = "Local VoIP Call",
+                                tint = if (peer.isLocalWifiPeer) AccentEmerald else MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+
+                        Box {
+                            IconButton(onClick = { showMenu = true }, modifier = Modifier.testTag("chat_menu_button")) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            }
+
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Clear Chat History") },
+                                    onClick = {
+                                        showMenu = false
+                                        showClearChatDialog = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = AccentRose)
+                                    },
+                                    modifier = Modifier.testTag("menu_clear_chat")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Report User / Chat") },
+                                    onClick = {
+                                        showMenu = false
+                                        reportExcerpt = messages.lastOrNull()?.text ?: ""
+                                        showReportDialog = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Flag, contentDescription = null, tint = AccentRose)
+                                    },
+                                    modifier = Modifier.testTag("menu_report_chat")
+                                )
+                            }
                         }
                     }
                 },
@@ -255,7 +322,7 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
-                if (messages.isEmpty()) {
+                if (filteredMessages.isEmpty()) {
                     item {
                         Column(
                             modifier = Modifier
@@ -264,13 +331,13 @@ fun ChatScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Direct text conversation with @${peer.username}",
+                                text = if (searchQuery.isNotBlank()) "No messages match '$searchQuery'" else "Direct text conversation with @${peer.username}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Send lightweight text messages via Cloud Firestore or direct Local Router P2P.",
+                                text = if (searchQuery.isNotBlank()) "Try searching a different phrase." else "Send lightweight text messages via Cloud Firestore or direct Local Router P2P.",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -278,16 +345,48 @@ fun ChatScreen(
                         }
                     }
                 } else {
-                    items(messages) { message ->
+                    items(filteredMessages) { message ->
                         MinimalMessageBubble(
                             message = message,
                             isCurrentUser = message.senderId == currentUser.uid,
+                            currentUserId = currentUser.uid,
+                            onUpvote = { onVoteMessage(message.id, true) },
+                            onDownvote = { onVoteMessage(message.id, false) },
                             onLongClick = {
-                                reportExcerpt = message.text
-                                showReportDialog = true
+                                selectedMessageForAction = message
                             }
                         )
                     }
+                }
+            }
+
+            // Quick canned reply chips
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val cannedReplies = listOf(
+                    "👋 Hello!",
+                    "👍 Sounds great",
+                    "🚗 On my way",
+                    "📞 Free to call?",
+                    "👌 Got it",
+                    "🙏 Thank you"
+                )
+                items(cannedReplies) { reply ->
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            onSendMessage(reply, preferLocalRouter)
+                        },
+                        label = { Text(reply, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        )
+                    )
                 }
             }
 
@@ -362,7 +461,7 @@ fun ChatScreen(
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Write a text message...") },
+                    placeholder = { Text("Write a message...") },
                     maxLines = 4,
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
@@ -395,6 +494,123 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    // Message Action Dialog (Copy text, Report)
+    if (selectedMessageForAction != null) {
+        val selectedMsg = selectedMessageForAction!!
+        AlertDialog(
+            onDismissRequest = { selectedMessageForAction = null },
+            title = { Text("Message Options") },
+            text = {
+                Column {
+                    Text(
+                        text = "\"${selectedMsg.text}\"",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // Reddit Karma breakdown
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Reddit Karma Score: ${if (selectedMsg.score > 0) "+${selectedMsg.score}" else "${selectedMsg.score}"}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = when {
+                                selectedMsg.score > 0 -> com.example.ui.theme.RedditOrange
+                                selectedMsg.score < 0 -> com.example.ui.theme.RedditDownvoteBlue
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+
+                        com.example.ui.components.RedditVotePill(
+                            score = selectedMsg.score,
+                            isUpvoted = selectedMsg.upvotedBy.contains(currentUser.uid),
+                            isDownvoted = selectedMsg.downvotedBy.contains(currentUser.uid),
+                            onUpvote = {
+                                onVoteMessage(selectedMsg.id, true)
+                                selectedMessageForAction = null
+                            },
+                            onDownvote = {
+                                onVoteMessage(selectedMsg.id, false)
+                                selectedMessageForAction = null
+                            },
+                            messageId = "dialog_${selectedMsg.id}"
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                clipboardManager.setText(AnnotatedString(selectedMsg.text))
+                                selectedMessageForAction = null
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Message copied to clipboard")
+                                }
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Copy text", style = MaterialTheme.typography.bodyLarge)
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                reportExcerpt = selectedMsg.text
+                                selectedMessageForAction = null
+                                showReportDialog = true
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Flag, contentDescription = null, tint = AccentRose)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Report message", style = MaterialTheme.typography.bodyLarge, color = AccentRose)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedMessageForAction = null }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // Clear Chat Confirmation Dialog
+    if (showClearChatDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearChatDialog = false },
+            title = { Text("Clear Conversation") },
+            text = { Text("Are you sure you want to clear all messages with @${peer.username}? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearChatDialog = false
+                        onClearChat()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRose)
+                ) {
+                    Text("Clear", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearChatDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Report Message Dialog
