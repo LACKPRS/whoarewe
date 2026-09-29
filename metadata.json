@@ -1,6 +1,6 @@
 {
   "name": "Kaiser",
-  "description": "Minimalist private messaging app with direct chats, groups, audio calls, and smooth real-time communication.",
+  "description": "Android application with automated GitHub Actions CI/CD workflow",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
