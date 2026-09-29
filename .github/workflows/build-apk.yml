@@ -28,7 +28,7 @@ jobs:
           chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon -Dkotlin.compiler.execution.strategy=out-of-process -x test -x testDebugUnitTest -x recordRoborazziDebug
+        run: ./gradlew :app:assembleDebug --no-daemon -Dkotlin.compiler.execution.strategy=out-of-process -x test -x testDebugUnitTest
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
