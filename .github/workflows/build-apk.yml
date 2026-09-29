@@ -22,19 +22,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Ensure Gradle Wrapper Exists
+      - name: Ensure Gradle Wrapper
         run: |
           if [ ! -f "gradlew" ]; then
-            echo "gradlew not found. Generating wrapper..."
-            gradle wrapper
+            echo "Generating Gradle 8.9 wrapper..."
+            gradle wrapper --gradle-version 8.9
           fi
           chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon -Dkotlin.compiler.execution.strategy=out-of-process
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
