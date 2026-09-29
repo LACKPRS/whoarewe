@@ -22,13 +22,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Matching Gradle 9.3.1 Wrapper
+      - name: Ensure Gradle 9.3.1 Wrapper
         run: |
           gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon -Dksp.run.in.process=false
+        run: ./gradlew :app:assembleDebug --no-daemon -x test -x testDebugUnitTest -x recordRoborazziDebug
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
